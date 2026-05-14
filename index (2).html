@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Lease: Slot Rogue-lite</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Press+Start+2P&display=swap');
+
+        @keyframes screen-shake {
+            0% { transform: translate(0,0); }
+            25% { transform: translate(5px, 5px); }
+            50% { transform: translate(-5px, -5px); }
+            75% { transform: translate(5px, -5px); }
+            100% { transform: translate(0,0); }
+        }
+
+        .shake { animation: screen-shake 0.1s infinite; }
+        .shake-heavy { animation: screen-shake 0.05s infinite; }
+
+        @keyframes big-win-rainbow {
+            0% { color: #ff0000; text-shadow: 0 0 20px #ff0000; }
+            20% { color: #ff00ff; text-shadow: 0 0 20px #ff00ff; }
+            40% { color: #0000ff; text-shadow: 0 0 20px #0000ff; }
+            60% { color: #00ffff; text-shadow: 0 0 20px #00ffff; }
+            80% { color: #00ff00; text-shadow: 0 0 20px #00ff00; }
+            100% { color: #ffff00; text-shadow: 0 0 20px #ffff00; }
+        }
+
+        .big-win-text {
+            animation: big-win-rainbow 0.5s linear infinite;
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+            font-size: 4rem;
+        }
+
+        :root {
+            --gold: #ffd700;
+            --neon-blue: #00f2ff;
+            --neon-red: #ff3131;
+        }
+
+        body {
+            background-color: #0a0a0c;
+            color: #e0e0e0;
+            font-family: 'Courier Prime', monospace;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        @media (min-width: 1024px) {
+            body { overflow: hidden; }
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            width: 100vw;
+            max-width: 1200px;
+            height: 100vh;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        @media (min-width: 1024px) {
+            .game-container {
+                grid-template-columns: 300px 1fr 300px;
+                height: 85vh;
+                overflow: hidden;
+            }
+        }
+
+        /* Dashboard Styling */
+        .panel {
+            background: #16161a;
+            border: 2px solid #333;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-family: 'Press Start 2P', cursive; font-size: 1.2rem; color: #fff; margin-bottom: 15px; }
+        .stat-value.rent-warning { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); }
+
+        /* Slot Machine Area */
+        .machine-core {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .reels-container {
+            background: #000;
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            border-radius: 12px;
+            border: 4px solid #222;
+            box-shadow: inset 0 0 30px rgba(0,0,0,1), 0 0 15px rgba(0,0,0,0.5);
+            width: 100%;
+            height: 140px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        @media (min-width: 768px) {
+            .reels-container { height: 220px; gap: 15px; padding: 20px; border: 6px solid #222; }
+        }
+
+        .reel {
+            flex: 1;
+            background: #fff;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reel-strip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .symbol {
+            height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            user-select: none;
+        }
+
+        @media (min-width: 768px) {
+            .symbol { height: 180px; font-size: 5rem; }
+        }
+
+        .symbol.win-animate {
+            animation: symbol-pulse 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite;
+            z-index: 10;
+        }
+
+        @keyframes symbol-pulse {
+            0% { transform: scale(1); filter: brightness(1) saturate(1); }
+            50% { transform: scale(1.3); filter: brightness(1.8) saturate(1.5) drop-shadow(0 0 25px var(--gold)); }
+            100% { transform: scale(1); filter: brightness(1) saturate(1); }
+        }
+
+        .reel.anticipation {
+            box-shadow: 0 0 70px #ff0000, inset 0 0 30px #ff0000;
+            border-color: #ff0000 !important;
+            animation: anticipation-glow 0.15s infinite alternate;
+            z-index: 50;
+            transform: scale(1.05);
+        }
+
+        @keyframes anticipation-glow {
+            from { filter: brightness(1) contrast(1.2); transform: scale(1.05); }
+            to { filter: brightness(2) contrast(1.5); transform: scale(1.1); }
+        }
+
+        .machine-zoom {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: scale(1.1);
+        }
+
+        .near-miss-ghost {
+            position: absolute;
+            font-size: 4rem;
+            opacity: 0.3;
+            filter: grayscale(1) blur(1px);
+            pointer-events: none;
+            z-index: 40;
+            animation: ghost-float 1.5s ease-out forwards;
+        }
+
+        @keyframes ghost-float {
+            0% { transform: scale(0.5); opacity: 0; }
+            20% { transform: scale(1.2); opacity: 0.4; }
+            80% { transform: scale(1); opacity: 0.2; }
+            100% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+        }
+
+        .so-close-text {
+            position: absolute;
+            color: #ff3131;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8rem;
+            text-shadow: 2px 2px 0 #000;
+            z-index: 41;
+            animation: ghost-float 1.5s ease-out forwards;
+            white-space: nowrap;
+        }
+
+        .flash-win { animation: screen-flash 0.2s 2; }
+        @keyframes screen-flash {
+            0% { background: #0a0a0c; }
+            50% { background: #333; }
+            100% { background: #0a0a0c; }
+        }
+
+        /* Lever */
+        .lever-btn {
+            margin-top: 30px;
+            background: linear-gradient(145deg, #333, #111);
+            border: 2px solid #444;
+            padding: 20px 60px;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 50px;
+            box-shadow: 0 8px 0 #000, 0 10px 20px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+        }
+
+        .lever-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #000, 0 5px 10px rgba(0,0,0,0.5);
+        }
+
+        .lever-btn:disabled {
+            filter: grayscale(1);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* Overlay Systems */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Start from top to allow scrolling */
+            padding: 40px 20px;
+            overflow-y: auto; /* Enable scrolling for small screens */
+            backdrop-filter: blur(10px);
+        }
+
+        #doubleOverlay {
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(15px);
+        }
+
+        .gamble-monitor {
+            background: #0a0a0c;
+            border: 4px solid #333;
+            width: 140px;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 3rem;
+            color: #444;
+            border-radius: 12px;
+            transition: all 0.05s;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        @media (min-width: 768px) {
+            .gamble-monitor { width: 180px; height: 180px; font-size: 4.5rem; }
+        }
+
+        .gamble-monitor:hover {
+            border-color: #555;
+            color: #666;
+        }
+
+        .gamble-monitor.active-flicker {
+            border-color: var(--gold);
+            box-shadow: 0 0 40px var(--gold), inset 0 0 20px var(--gold);
+            color: var(--gold);
+            background: #1a1a00;
+        }
+
+        .gamble-monitor.selected {
+            border-color: var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        .draft-card {
+            background: #1a1a20;
+            border: 2px solid #444;
+            padding: 20px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex-shrink: 0; /* Prevent shrinking in flex containers */
+            margin-bottom: 10px;
+        }
+
+        @media (min-width: 768px) {
+            .draft-card { padding: 30px; width: 200px; }
+        }
+
+        .draft-card:hover {
+            border-color: var(--neon-blue);
+            transform: translateY(-5px);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+        }
+
+        .draft-card h3 { font-family: 'Press Start 2P', cursive; font-size: 0.8rem; margin-bottom: 20px; }
+        .draft-card .icon { font-size: 4rem; margin-bottom: 15px; }
+        .draft-card .desc { font-size: 0.75rem; color: #aaa; }
+
+        #coin-canvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2000;
+        }
+
+        .log-container {
+            font-size: 0.7rem;
+            height: 150px;
+            overflow-y: auto;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+            color: #888;
+        }
+
+        .log-entry { margin-bottom: 4px; border-left: 2px solid #444; padding-left: 6px; }
+        .log-entry.gain { border-left-color: #4ade80; color: #4ade80; }
+        .log-entry.loss { border-left-color: #f87171; color: #f87171; }
+
+        /* Rarity Glows */
+        .inv-item { position: relative; transition: all 0.2s; }
+        .rarity-Common { border-color: #4b5563 !important; }
+        .rarity-Uncommon { border-color: #16a34a !important; box-shadow: 0 0 5px rgba(22, 163, 74, 0.3); }
+        .rarity-Rare { border-color: #2563eb !important; box-shadow: 0 0 8px rgba(37, 99, 235, 0.4); }
+        .rarity-Epic { border-color: #9333ea !important; box-shadow: 0 0 12px rgba(147, 51, 234, 0.5); }
+        .rarity-Legendary { border-color: #ca8a04 !important; box-shadow: 0 0 18px rgba(202, 138, 4, 0.6); }
+
+        @keyframes perk-sparkle {
+            0% { filter: brightness(1); transform: scale(1); }
+            50% { filter: brightness(2) saturate(1.5); transform: scale(1.05); box-shadow: 0 0 20px white; }
+            100% { filter: brightness(1); transform: scale(1); }
+        }
+        .perk-up { animation: perk-sparkle 0.6s ease-out; }
+
+        .cursed-card {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.4) !important;
+            animation: cursed-pulse 2s infinite;
+        }
+
+        @keyframes cursed-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 10px rgba(220, 38, 38, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 30px rgba(220, 38, 38, 0.7); }
+            100% { transform: scale(1); box-shadow: 0 0 10px rgba(220, 38, 38, 0.4); }
+        }
+
+        @keyframes float-up-fade {
+            0% { transform: translateY(0); opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        .floating-win-text {
+            position: fixed;
+            pointer-events: none;
+            z-index: 3000;
+            font-family: 'Press Start 2P', cursive;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5), 2px 2px 0 #000;
+            animation: float-up-fade 1s ease-out forwards;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .floating-win-text.flat { color: #4ade80; }
+        .floating-win-text.mult2 { color: #60a5fa; font-size: 1.1rem; }
+        .floating-win-text.mult3 { color: #c084fc; font-size: 1.2rem; }
+        .floating-win-text.gold { color: #fbbf24; font-size: 1.3rem; text-shadow: 0 0 15px #fbbf24; }
+        .floating-win-text.crit { color: #f87171; font-size: 1.5rem; font-weight: 900; }
+    </style>
+</head>
+<body>
+
+    <canvas id="coin-canvas"></canvas>
+
+    <!-- Settings Button -->
+    <button onclick="toggleSettings()" class="fixed top-4 right-4 z-[3000] bg-gray-800/80 p-3 rounded-full border border-gray-600 hover:border-yellow-500 text-white transition-all shadow-lg cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+    </button>
+
+    <!-- Settings Overlay -->
+    <div id="settingsOverlay" class="overlay justify-center">
+        <div class="bg-gray-900 border-2 border-gray-700 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+            <h2 class="text-2xl font-bold mb-6 text-white text-center" style="font-family: 'Press Start 2P'">SETTINGS</h2>
+            
+            <div class="space-y-6">
+                <!-- Volume -->
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs uppercase text-gray-400">Master Volume</label>
+                        <span id="volVal" class="text-xs text-yellow-500 font-bold">50%</span>
+                    </div>
+                    <input type="range" id="volSlider" min="0" max="100" value="50" oninput="updateSettings('volume', this.value)" class="w-full accent-yellow-500">
+                </div>
+
+                <!-- Zoom -->
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs uppercase text-gray-400">UI Zoom</label>
+                        <span id="zoomVal" class="text-xs text-blue-400 font-bold">100%</span>
+                    </div>
+                    <input type="range" id="zoomSlider" min="50" max="150" value="100" oninput="updateSettings('zoom', this.value)" class="w-full accent-blue-500">
+                </div>
+
+                <!-- Toggles -->
+                <div class="flex items-center justify-between p-3 bg-black/30 rounded-lg">
+                    <label class="text-sm text-gray-300">Particles (Coins)</label>
+                    <input type="checkbox" id="partToggle" checked onchange="updateSettings('particles', this.checked)" class="w-5 h-5 accent-green-500">
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-black/30 rounded-lg">
+                    <label class="text-sm text-gray-300">Screen Shakes</label>
+                    <input type="checkbox" id="shakeToggle" checked onchange="updateSettings('shakes', this.checked)" class="w-5 h-5 accent-red-500">
+                </div>
+            </div>
+
+            <button onclick="toggleSettings()" class="w-full mt-8 bg-white text-black py-3 font-bold rounded-lg hover:bg-gray-200 transition-colors">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- UI Overlay for Drafting Symbols -->
+    <div id="draftOverlay" class="overlay p-4">
+        <h2 class="text-2xl md:text-4xl font-bold mb-2 text-blue-400 text-center" style="font-family: 'Press Start 2P'">PAYMENT RECEIVED</h2>
+        <p class="text-gray-400 mb-8 text-center text-sm md:text-base">The Landlord is satisfied... for now. Choose an addition.</p>
+        <div class="flex flex-col md:flex-row gap-4 md:gap-8 w-full items-center justify-center" id="draftOptions">
+            <!-- Cards injected by JS -->
+        </div>
+    </div>
+
+    <!-- Big Win Celebration Overlay -->
+    <div id="bigWinOverlay" class="overlay justify-center items-center pointer-events-none" style="background: rgba(0,0,0,0.8)">
+        <div class="big-win-text mb-4">BIG WIN</div>
+        <div id="bigWinAmount" class="text-6xl text-white font-bold" style="font-family: 'Press Start 2P'">0</div>
+    </div>
+
+    <!-- UI Overlay for Game Over -->
+    <div id="gameOverOverlay" class="overlay">
+        <h2 class="text-6xl font-bold mb-4 text-red-600" style="font-family: 'Press Start 2P'">EVICTED</h2>
+        <p class="text-2xl mb-8" id="finalStats">You survived 0 days.</p>
+        <button onclick="location.reload()" class="bg-white text-black px-8 py-3 font-bold rounded hover:bg-gray-200">TRY AGAIN</button>
+    </div>
+
+    <!-- Double or Nothing Overlay -->
+    <div id="doubleOverlay" class="overlay justify-center">
+        <h2 class="text-2xl md:text-4xl font-bold mb-2 text-yellow-400 text-center" style="font-family: 'Press Start 2P'">DOUBLE OR NOTHING?</h2>
+        <p class="text-gray-500 mb-8 uppercase tracking-widest text-xs">Choose a monitor to start the sequence</p>
+        
+        <div id="gamblePotDisplay" class="text-5xl md:text-7xl font-bold mb-12 text-white" style="text-shadow: 0 0 20px rgba(255,255,255,0.3)">0</div>
+        
+        <div id="gambleChoices" class="flex flex-col items-center gap-8 mb-12">
+            <div class="flex gap-6 md:gap-12">
+                <div id="monitorA" onclick="pickGamble('A')" class="gamble-monitor">A</div>
+                <div id="monitorB" onclick="pickGamble('B')" class="gamble-monitor">B</div>
+            </div>
+            <button id="skipGambleBtn" onclick="collectGamble()" class="text-gray-500 hover:text-white transition-colors uppercase tracking-[0.3em] text-xs font-bold border-b border-gray-800 pb-1 cursor-pointer">
+                [ Decline & Collect ]
+            </button>
+        </div>
+
+        <div id="gambleResultControls" class="hidden flex flex-col items-center">
+            <h3 id="gambleStatus" class="text-2xl mb-6 font-bold text-center"></h3>
+            <div class="flex gap-4">
+                <button id="gambleAgainBtn" onclick="resetGambleUI()" class="bg-blue-600 text-white px-6 py-3 font-bold rounded hover:bg-blue-500 transition-colors">GO AGAIN</button>
+                <button onclick="collectGamble()" class="bg-green-600 text-white px-6 py-3 font-bold rounded hover:bg-green-500 transition-colors">COLLECT</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- Left Panel: Stats (Top on mobile) -->
+        <div class="panel order-1 lg:order-none">
+            <h2 class="text-lg font-bold mb-4 border-b border-gray-700 pb-2 hidden md:block">RUN STATUS</h2>
+            
+            <div class="grid grid-cols-3 lg:grid-cols-1 gap-2">
+                <div>
+                    <div class="stat-label">Balance</div>
+                    <div id="balanceDisplay" class="stat-value text-green-400 text-sm md:text-xl">100</div>
+                </div>
+                <div>
+                    <div class="stat-label">Rent</div>
+                    <div id="rentDisplay" class="stat-value rent-warning text-sm md:text-xl">50</div>
+                </div>
+                <div>
+                    <div class="stat-label">Spins</div>
+                    <div id="spinsDisplay" class="stat-value text-sm md:text-xl">5</div>
+                </div>
+            </div>
+
+            <div class="mt-auto hidden lg:block">
+                <div class="stat-label">Days Survived</div>
+                <div id="dayDisplay" class="stat-value">1</div>
+            </div>
+
+            <!-- Loan Shark Panel -->
+            <div id="loanPanel" class="mt-4 pt-4 border-t border-gray-700 hidden">
+                <div class="stat-label mb-2">LOAN SHARK</div>
+                <div id="loanBtnContainer" class="flex flex-col gap-2">
+                    <button onclick="takeLoan(300)" class="text-[9px] bg-red-900/30 border border-red-700 p-1 hover:bg-red-800 transition-colors text-white">BORROW 300 (DUE 450)</button>
+                    <button onclick="takeLoan(800)" class="text-[9px] bg-red-900/50 border border-red-500 p-1 hover:bg-red-700 transition-colors text-white font-bold">BORROW 800 (DUE 1200)</button>
+                </div>
+                <div id="loanStatus" class="hidden"></div>
+            </div>
+        </div>
+
+        <!-- Center: Machine (Middle) -->
+        <div class="machine-core order-2 lg:order-none py-4">
+            <div class="text-center mb-4 md:mb-8">
+                <h1 class="text-3xl md:text-5xl font-black italic tracking-tighter" style="color: var(--gold); text-shadow: 2px 2px 0 #000;">LUCKY LEASE</h1>
+                <p class="text-[8px] md:text-xs uppercase tracking-widest text-gray-500">A Rogue-lite Slot Survival Game</p>
+            </div>
+
+            <div class="reels-container">
+                <div class="reel" id="reel1"><div class="reel-strip" id="strip1"></div></div>
+                <div class="reel" id="reel2"><div class="reel-strip" id="strip2"></div></div>
+                <div class="reel" id="reel3"><div class="reel-strip" id="strip3"></div></div>
+            </div>
+
+            <button id="spinBtn" onclick="spin()" class="lever-btn w-full md:w-auto mt-6 md:mt-10">SPIN (-5)</button>
+            <p class="mt-4 text-[10px] text-gray-600 text-center">Cost increases as you survive.</p>
+        </div>
+
+        <!-- Right Panel: Inventory & Logs (Bottom on mobile) -->
+        <div class="panel order-3 lg:order-none">
+            <h2 class="text-lg font-bold mb-2 border-b border-gray-700 pb-2">UPGRADES</h2>
+            <div id="perksList" class="grid grid-cols-1 gap-1 mb-4 overflow-y-auto max-h-[250px]">
+                <div class="text-gray-600 text-[10px] italic">No active perks yet...</div>
+            </div>
+
+            <h2 class="text-lg font-bold mb-2 border-b border-gray-700 pb-2">INVENTORY</h2>
+            <div id="inventoryList" class="flex flex-wrap gap-1 md:gap-2 mb-4 overflow-y-auto max-h-[100px] lg:max-h-[200px]">
+                <!-- Symbols shown here -->
+            </div>
+
+            <h2 class="text-lg font-bold mb-2 border-b border-gray-700 pb-2">LOG</h2>
+            <div class="log-container h-[80px] lg:h-[150px]" id="gameLog">
+                <div class="log-entry">Run started.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Settings Management ---
+        let settings = {
+            volume: 50,
+            zoom: 100,
+            particles: true,
+            shakes: true
+        };
+
+        function initSettings() {
+            const saved = localStorage.getItem('luckyLeaseSettings');
+            if (saved) {
+                settings = {...settings, ...JSON.parse(saved)};
+            }
+            // Update UI elements to match settings
+            document.getElementById('volSlider').value = settings.volume;
+            document.getElementById('volVal').textContent = settings.volume + '%';
+            document.getElementById('zoomSlider').value = settings.zoom;
+            document.getElementById('zoomVal').textContent = settings.zoom + '%';
+            document.getElementById('partToggle').checked = settings.particles;
+            document.getElementById('shakeToggle').checked = settings.shakes;
+            applyZoom();
+        }
+
+        function toggleSettings() {
+            const el = document.getElementById('settingsOverlay');
+            el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function updateSettings(key, val) {
+            if (key === 'volume' || key === 'zoom') {
+                settings[key] = parseInt(val);
+                document.getElementById(key === 'volume' ? 'volVal' : 'zoomVal').textContent = val + '%';
+                if (key === 'zoom') applyZoom();
+            } else {
+                settings[key] = val;
+            }
+            localStorage.setItem('luckyLeaseSettings', JSON.stringify(settings));
+        }
+
+        function applyZoom() {
+            const container = document.querySelector('.game-container');
+            container.style.transform = `scale(${settings.zoom / 100})`;
+            container.style.transformOrigin = 'center top';
+        }
+
+        function triggerShake(heavy = false) {
+            if (!settings.shakes) return;
+            const container = document.querySelector('.game-container');
+            const cls = heavy ? 'shake-heavy' : 'shake';
+            container.classList.add(cls);
+            setTimeout(() => container.classList.remove(cls), heavy ? 300 : 200);
+        }
+
+        // --- Game Config ---
+        const ALL_SYMBOLS = {
+            '🐀': { name: 'Rat', value: -5, rarity: 'Common', desc: 'Infestation! Subtracts 5 from payout.' },
+            '🪳': { name: 'Roach', value: -10, rarity: 'Common', desc: 'Disgusting! Subtracts 10 from payout.' },
+            '🍒': { name: 'Cherry', value: 1, rarity: 'Common', desc: 'A basic fruit. Stays fresh.' },
+            '🍋': { name: 'Lemon', value: 2, rarity: 'Common', desc: 'A bit sour, but pays more.' },
+            '🍊': { name: 'Orange', value: 3, rarity: 'Common', desc: 'Juicy rewards.' },
+            '🍐': { name: 'Pear', value: 4, rarity: 'Common', desc: 'Simple and reliable.' },
+            '🍓': { name: 'Strawberry', value: 9, rarity: 'Common', desc: 'Sweet and simple.' },
+            '🍌': { name: 'Banana', value: 6, rarity: 'Common', desc: 'Doubles if next to Fire 🔥.' },
+            '🍄': { name: 'Mushroom', value: 5, rarity: 'Common', desc: '+15 value for each Mushroom in spin.' },
+            '🍦': { name: 'Ice Cream', value: 7, rarity: 'Common', desc: 'Sweet, sweet rewards.' },
+            '🍔': { name: 'Burger', value: 10, rarity: 'Common', desc: 'Pairs with Fries 🍟 for +100 bonus.' },
+            '🍟': { name: 'Fries', value: 10, rarity: 'Common', desc: 'Pairs with Burger 🍔 for +100 bonus.' },
+            '🍗': { name: 'Chicken', value: 12, rarity: 'Common', desc: 'Finger-lickin earnings.' },
+            '🥥': { name: 'Coconut', value: 11, rarity: 'Uncommon', desc: 'Hard to crack, great payout.' },
+            '🥑': { name: 'Avocado', value: 14, rarity: 'Uncommon', desc: 'The trendy toast topper.' },
+            '🍇': { name: 'Grapes', value: 8, rarity: 'Uncommon', desc: 'Grows in clusters.' },
+            '👻': { name: 'Ghost', value: 10, rarity: 'Uncommon', desc: 'Doubles adjacent Diamonds 💎.' },
+            '🍉': { name: 'Watermelon', value: 12, rarity: 'Uncommon', desc: 'Heavy and profitable.' },
+            '🍩': { name: 'Donut', value: 17, rarity: 'Uncommon', desc: 'Glazed in gold.' },
+            '🔔': { name: 'Bell', value: 15, rarity: 'Uncommon', desc: 'Ring it for a payday.' },
+            '🔥': { name: 'Fire', value: 18, rarity: 'Uncommon', desc: 'Doubles adjacent Banana 🍌 or Pineapple 🍍.' },
+            '🗝️': { name: 'Key', value: 5, rarity: 'Uncommon', desc: 'Opens Lock 🔒 for 500 credits.' },
+            '🍕': { name: 'Pizza', value: 24, rarity: 'Rare', desc: 'A slice of wealth.' },
+            '🍍': { name: 'Pineapple', value: 20, rarity: 'Rare', desc: 'Doubles if next to Fire 🔥.' },
+            '🍀': { name: 'Clover', value: 22, rarity: 'Rare', desc: 'A lucky find indeed.' },
+            '🎲': { name: 'Dice', value: 25, rarity: 'Rare', desc: 'RNG favors the bold.' },
+            '🍣': { name: 'Sushi', value: 28, rarity: 'Rare', desc: 'Premium rolls, premium cash.' },
+            '💰': { name: 'Coin Bag', value: 30, rarity: 'Rare', desc: 'Direct cash injection.' },
+            '🪐': { name: 'Planet', value: 35, rarity: 'Rare', desc: 'Triples if next to Super Star ⭐.' },
+            '🧪': { name: 'Potion', value: 40, rarity: 'Rare', desc: 'Permanently adds +2 value to adjacent symbols.' },
+            '🕰️': { name: 'Antique Clock', value: 45, rarity: 'Rare', desc: 'Worth more as time goes by.' },
+            '🌊': { name: 'Wave', value: 5, rarity: 'Rare', desc: 'Gains +10 base value every Day.' },
+            '🔒': { name: 'Lock', value: 50, rarity: 'Epic', desc: 'Worth 500 if Key 🗝️ is present.' },
+            '🎨': { name: 'Art Palette', value: 55, rarity: 'Epic', desc: 'Painting a profitable future.' },
+            '💎': { name: 'Diamond', value: 50, rarity: 'Epic', desc: 'Value doubled by Ghosts 👻.' },
+            '⭐': { name: 'Super Star', value: 60, rarity: 'Epic', desc: 'Triples adjacent Planets 🪐.' },
+            '🎸': { name: 'Electric Guitar', value: 70, rarity: 'Epic', desc: 'Rock out with your cash out.' },
+            '⚡': { name: 'Bolt', value: 75, rarity: 'Epic', desc: 'Electrifying earnings.' },
+            '🧬': { name: 'DNA', value: 85, rarity: 'Epic', desc: 'The building blocks of wealth.' },
+            '🎬': { name: 'Movie Clapper', value: 90, rarity: 'Epic', desc: 'Action! Big money awaits.' },
+            '🧙': { name: 'Wizard', value: 100, rarity: 'Epic', desc: 'Doubles all Rare symbols in spin.' },
+            '🏔️': { name: 'Mountain', value: 40, rarity: 'Epic', desc: 'x5 Multiplier if reels 1 & 3 match.' },
+            '🐖': { name: 'Piggy Bank', value: 10, rarity: 'Epic', desc: 'Adds 1% of your balance to payout.' },
+            '7️⃣': { name: 'Lucky 7', value: 100, rarity: 'Legendary', desc: 'The jackpot king.' },
+            '👑': { name: 'Crown', value: 150, rarity: 'Legendary', desc: 'Fit for a slot king.' },
+            '🦄': { name: 'Unicorn', value: 200, rarity: 'Legendary', desc: 'Mythical-level gains.' },
+            '🌈': { name: 'Rainbow', value: 250, rarity: 'Legendary', desc: 'A pot of gold.' },
+            '🐉': { name: 'Dragon', value: 400, rarity: 'Legendary', desc: 'Ancient wealth unleashed.' },
+            '🌋': { name: 'Volcano', value: 500, rarity: 'Legendary', desc: 'Erupting with credits.' },
+            '🛸': { name: 'UFO', value: 300, rarity: 'Legendary', desc: 'Abducts adjacent Common symbol, +150 credits.' },
+            '☀️': { name: 'Sun', value: 50, rarity: 'Rare', desc: 'Doubles value on Odd Days.' },
+            '🌑': { name: 'Moon', value: 50, rarity: 'Rare', desc: 'Doubles value on Even Days.' },
+            '🧸': { name: 'Teddy Bear', value: 5, rarity: 'Uncommon', desc: '+2 value for every symbol in inventory.' },
+            '🏹': { name: 'Archer', value: 25, rarity: 'Rare', desc: 'Every 10 spins, removes a Common for 300 credits.' },
+            '⚒️': { name: 'Hammer', value: 30, rarity: 'Uncommon', desc: '+100 value if next to Mountain 🏔️.' },
+            '🥚': { name: 'Egg', value: 1, rarity: 'Common', desc: 'Hatches into an Eagle 🦅 after 5 spins.' },
+            '🦅': { name: 'Eagle', value: 350, rarity: 'Legendary', desc: 'Majestic high-altitude payouts.' },
+            '🐛': { name: 'Caterpillar', value: 2, rarity: 'Common', desc: 'Becomes a Butterfly 🦋 after 5 spins.' },
+            '🦋': { name: 'Butterfly', value: 120, rarity: 'Epic', desc: 'Beautifully high value.' },
+            '🌱': { name: 'Sprout', value: 3, rarity: 'Common', desc: 'Grows into an Ancient Tree 🌳 after 5 spins.' },
+            '🌳': { name: 'Ancient Tree', value: 150, rarity: 'Epic', desc: 'Deep-rooted wealth.' },
+            '🌌': { name: 'Galaxy', value: 750, rarity: 'Legendary', desc: 'Ultimate cosmic payday.' }
+        };
+
+        const PERKS = {
+            'LIFE': { name: 'Rent Shield', desc: 'Survive one eviction. (Stackable)', icon: '🛡️', color: 'text-red-400' },
+            'MULT': { name: 'Wealth Multiplier', desc: '+20% total earnings per level.', icon: '📈', color: 'text-yellow-400' },
+            'VALUE': { name: 'Efficient Slots', desc: '+2 value to every symbol per level.', icon: '⚙️', color: 'text-blue-400' },
+            'COST': { name: 'Bargain Hunter', desc: '-2 Spin Cost per level.', icon: '🏷️', color: 'text-green-400' },
+            'LUCK': { name: 'Draft Luck', desc: 'Higher chance for rare symbols in draft.', icon: '✨', color: 'text-purple-400' },
+            'JACKPOT': { name: 'Jackpot King', desc: '+1x Jackpot Multiplier per level.', icon: '👑', color: 'text-orange-400' },
+            'EXTRA': { name: 'Extra Spins', desc: '+1 Spin per day.', icon: '⏳', color: 'text-indigo-400' },
+            'REBATE': { name: 'Rent Rebate', desc: 'Keep 15% of rent paid per level.', icon: '💸', color: 'text-pink-400' },
+            'INTEREST': { name: 'Daily Interest', desc: 'Earn 5% of balance as interest per day.', icon: '📈', color: 'text-emerald-400' },
+            'CRIT': { name: 'Critical Spin', desc: '5% chance to 5x any win per level.', icon: '🎯', color: 'text-red-500' },
+            'SYNERGY': { name: 'Symbol Synergy', desc: 'Pairs grant an extra +50 flat value.', icon: '🔗', color: 'text-cyan-400' },
+            'TAX_BREAK': { name: 'Tax Break', desc: 'Rent increases 15% slower per level.', icon: '📉', color: 'text-slate-400' },
+            'MASTER': { name: 'Master Draft', desc: 'Pick +1 extra draft choice per level.', icon: '🏆', color: 'text-amber-400' },
+            'INSURANCE': { name: 'Insurance', desc: '10% chance for rent refund per level.', icon: '🌂', color: 'text-violet-400' },
+            'BOUNTY': { name: 'Bounty Hunter', desc: 'Every 5th spin is free per level.', icon: '🎯', color: 'text-rose-400' },
+            'CLEANSE': { name: 'Cleanse', desc: 'Remove 1 random Common symbol every rent day.', icon: '🧹', color: 'text-sky-400' },
+            'SALVAGE': { name: 'Salvage', desc: '25% chance for a Rare symbol when drafting Perks.', icon: '♻️', color: 'text-lime-400' },
+            'DIVIDEND': { name: 'Dividend', desc: 'Bonus 10% rent target if balance > 500.', icon: '💰', color: 'text-yellow-600' },
+            'RISK': { name: 'High Roller', desc: '+10% win rate in Double or Nothing.', icon: '🎰', color: 'text-red-400' },
+            'BLOOD_PACT': { name: 'Blood Pact', desc: '+50% Total Win Value, but lose 10% Balance every spin.', icon: '🩸', color: 'text-red-600', cursed: true }
+        };
+
+        const MODIFIERS = {
+            'FRIDAY_13': { name: 'Friday the 13th', desc: 'Values x0.77. Rats and Roaches infest the reels.', color: 'text-red-500' },
+            'HEAT_WAVE': { name: 'Heat Wave', desc: 'Fire symbols appear 3x more often!', color: 'text-orange-500' },
+            'GOLD_RUSH': { name: 'Gold Rush', desc: 'All gold/wealth symbols x2 value!', color: 'text-yellow-400' },
+            'CLEAR_SKIES': { name: 'Clear Skies', desc: 'No negative modifiers today.', color: 'text-blue-400' }
+        };
+
+        let state = {
+            balance: 300,
+            rentTarget: 25,
+            spinsUntilRent: 5,
+            day: 1,
+            spinCost: 2,
+            totalSpins: 0,
+            itemAge: {}, // Tracks spins for evolving items
+            isSpinning: false,
+            gamblePot: 0,
+            isGambling: false,
+            draftPicksRemaining: 1,
+            inventory: ['🍒', '🍒', '🍒', '🍋', '🍋', '🍊'],
+            perks: {
+                LIFE: 0, MULT: 0, VALUE: 0, COST: 0, LUCK: 0, JACKPOT: 0, 
+                EXTRA: 0, REBATE: 0, INTEREST: 0, CRIT: 0, SYNERGY: 0, 
+                TAX_BREAK: 0, MASTER: 0, INSURANCE: 0, BOUNTY: 0,
+                CLEANSE: 0, SALVAGE: 0, DIVIDEND: 0, RISK: 0, BLOOD_PACT: 0
+            },
+            pityCounter: 0,
+            loanAmount: 0,
+            loanTotalDue: 0
+        };
+
+        const reelStrips = [
+            document.getElementById('strip1'),
+            document.getElementById('strip2'),
+            document.getElementById('strip3')
+        ];
+
+        // --- Audio Engine ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (settings.volume === 0) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            const vol = settings.volume / 100;
+
+            if (type === 'spin') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+                gain.gain.setValueAtTime(0.05 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.01 * vol, now + 0.1);
+                osc.start();
+                osc.stop(now + 0.1);
+            } else if (type === 'stop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                gain.gain.setValueAtTime(0.2 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.01 * vol, now + 0.1);
+                osc.start();
+                osc.stop(now + 0.1);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                [261, 329, 392, 523].forEach((f, i) => {
+                    osc.frequency.setValueAtTime(f, now + (i * 0.1));
+                });
+                gain.gain.setValueAtTime(0.1 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.01 * vol, now + 0.4);
+                osc.start();
+                osc.stop(now + 0.4);
+            } else if (type === 'jackpot') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.linearRampToValueAtTime(880, now + 1);
+                gain.gain.setValueAtTime(0.1 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.01 * vol, now + 1);
+                osc.start();
+                osc.stop(now + 1);
+            } else if (type === 'click') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.05 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.01 * vol, now + 0.05);
+                osc.start();
+                osc.stop(now + 0.05);
+            } else if (type === 'collect') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, now);
+                gain.gain.setValueAtTime(0.02 * vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001 * vol, now + 0.05);
+                osc.start();
+                osc.stop(now + 0.05);
+            }
+        }
+
+        // --- Core Logic ---
+
+        function animateBalance(start, end) {
+            const duration = 1000;
+            const startTime = performance.now();
+            const el = document.getElementById('balanceDisplay');
+            
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const current = Math.floor(start + (end - start) * progress);
+                el.textContent = current;
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    el.textContent = Math.floor(end);
+                    el.classList.remove('scale-110', 'text-white');
+                }
+            }
+            el.classList.add('scale-110', 'text-white', 'transition-all');
+            requestAnimationFrame(update);
+        }
+
+        let lastPerkLevels = {};
+
+        function updateUI() {
+            // Apply Perks to dynamic stats
+            const actualSpinCost = Math.max(1, state.spinCost - (state.perks.COST * 2));
+            
+            // Note: Balance is updated via animateBalance for wins
+            if (!state.isSpinning) {
+                document.getElementById('balanceDisplay').textContent = Math.floor(state.balance);
+            }
+            document.getElementById('rentDisplay').textContent = state.rentTarget;
+            document.getElementById('spinsDisplay').textContent = state.spinsUntilRent;
+            document.getElementById('dayDisplay').textContent = state.day;
+            document.getElementById('spinBtn').textContent = `SPIN (-${actualSpinCost})`;
+
+            // Sorted Inventory Display
+            const invEl = document.getElementById('inventoryList');
+            invEl.innerHTML = '';
+            const rarityOrder = { 'Legendary': 4, 'Epic': 3, 'Rare': 2, 'Uncommon': 1, 'Common': 0 };
+            const sortedInv = [...state.inventory].sort((a, b) => rarityOrder[ALL_SYMBOLS[b].rarity] - rarityOrder[ALL_SYMBOLS[a].rarity]);
+            
+            sortedInv.forEach(sym => {
+                const data = ALL_SYMBOLS[sym];
+                const span = document.createElement('span');
+                span.className = `inv-item bg-gray-900 p-2 rounded text-xl border-2 rarity-${data.rarity}`;
+                span.textContent = sym;
+                span.title = `${data.name} (${data.rarity}): ${data.desc}`;
+                invEl.appendChild(span);
+            });
+
+            // Update Perks Display with spark animation
+            const perksList = document.getElementById('perksList');
+            if (perksList) {
+                perksList.innerHTML = '';
+                let activeCount = 0;
+                Object.keys(state.perks).forEach(key => {
+                    const currentLevel = state.perks[key];
+                    if (currentLevel > 0) {
+                        activeCount++;
+                        const perk = PERKS[key];
+                        const div = document.createElement('div');
+                        
+                        // Detect level up for animation
+                        const isNewLevel = lastPerkLevels[key] !== undefined && lastPerkLevels[key] < currentLevel;
+                        const animClass = isNewLevel ? 'perk-up' : '';
+                        
+                        div.className = `flex justify-between items-center bg-gray-900 p-2 rounded border border-gray-800 text-[10px] ${perk.color} ${animClass} transition-all`;
+                        div.innerHTML = `<span>${perk.icon} ${perk.name}</span> <span class="font-bold">Lv.${currentLevel}</span>`;
+                        perksList.appendChild(div);
+                        
+                        lastPerkLevels[key] = currentLevel;
+                    } else {
+                        lastPerkLevels[key] = 0;
+                    }
+                });
+                
+                if (activeCount === 0) {
+                    perksList.innerHTML = '<div class="text-gray-600 text-[10px] italic">No active perks yet...</div>';
+                }
+            }
+
+            if (state.balance < actualSpinCost && state.spinsUntilRent > 0) {
+                checkGameOver();
+            }
+
+            // Loan UI Update
+            const loanPanel = document.getElementById('loanPanel');
+            const loanBtnContainer = document.getElementById('loanBtnContainer');
+            const loanStatus = document.getElementById('loanStatus');
+
+            // Only show loan shark if balance is low or they already have a loan
+            const isDesperate = state.balance < state.rentTarget || (state.balance < (state.spinCost * 5));
+            if (isDesperate || state.loanAmount > 0) {
+                loanPanel.classList.remove('hidden');
+            } else {
+                loanPanel.classList.add('hidden');
+            }
+
+            if (state.loanAmount > 0) {
+                loanBtnContainer.classList.add('hidden');
+                loanStatus.classList.remove('hidden');
+                loanStatus.innerHTML = `<div class="text-[10px] text-red-500 font-bold animate-pulse">DEBT DUE: ${state.loanTotalDue}</div>`;
+            } else {
+                loanBtnContainer.classList.remove('hidden');
+                loanStatus.classList.add('hidden');
+            }
+        }
+
+        function addLog(msg, type = '') {
+            const log = document.getElementById('gameLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[Day ${state.day}] ${msg}`;
+            log.prepend(entry);
+        }
+
+        async function spin() {
+            let actualSpinCost = Math.max(1, state.spinCost - (state.perks.COST * 2));
+            if (state.perks.BOUNTY > 0 && state.totalSpins % Math.max(1, (6 - state.perks.BOUNTY)) === 0) {
+                actualSpinCost = 0;
+                addLog("Bounty Hunter: Free Spin triggered!", "gain");
+            }
+            if (state.isSpinning || state.balance < actualSpinCost) return;
+
+            // Heat Wave Modifier Injector
+            let currentPool = [...state.inventory];
+            if (state.activeModifier === 'HEAT_WAVE') {
+                currentPool.push('🔥', '🔥', '🔥', '🔥', '🔥');
+            }
+            if (state.activeModifier === 'FRIDAY_13') {
+                currentPool.push('🐀', '🐀', '🪳', '🪳');
+            }
+
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            playSound('click');
+            state.isSpinning = true;
+            state.totalSpins++;
+
+            // Evolve items logic
+            const evolutionMap = { '🥚': '🦅', '🐛': '🦋', '🌱': '🌳' };
+            state.inventory.forEach((item, idx) => {
+                if (evolutionMap[item]) {
+                    state.itemAge[idx] = (state.itemAge[idx] || 0) + 1;
+                    if (state.itemAge[idx] >= 5) {
+                        state.inventory[idx] = evolutionMap[item];
+                        delete state.itemAge[idx];
+                        addLog(`${item} evolved!`, "gain");
+                    }
+                }
+            });
+
+            const oldBalance = state.balance;
+            state.balance -= actualSpinCost;
+            
+            if (state.perks.BLOOD_PACT > 0) {
+                const drain = Math.floor(state.balance * 0.1);
+                state.balance -= drain;
+                if (drain > 0) addLog(`Blood Pact: -${drain} credits.`, 'loss');
+            }
+
+            state.spinsUntilRent--;
+            updateUI();
+            
+            triggerShake(false);
+            document.getElementById('spinBtn').disabled = true;
+
+            const results = [];
+            for (let i = 0; i < 3; i++) {
+                const res = state.inventory[Math.floor(Math.random() * state.inventory.length)];
+                results.push(res);
+                
+                const isAnticipation = (i === 2 && results[0] === results[1]);
+                if (isAnticipation) {
+                    const reelEl = document.getElementById('reel3');
+                    const machine = document.querySelector('.machine-core');
+                    reelEl.classList.add('anticipation');
+                    machine.classList.add('machine-zoom');
+                    
+                    // Tension sound
+                    const tensionOsc = audioCtx.createOscillator();
+                    const tensionGain = audioCtx.createGain();
+                    tensionOsc.connect(tensionGain); tensionGain.connect(audioCtx.destination);
+                    tensionOsc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    tensionOsc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 3.5);
+                    tensionGain.gain.setValueAtTime(0.08 * (settings.volume/100), audioCtx.currentTime);
+                    tensionOsc.start(); tensionOsc.stop(audioCtx.currentTime + 3.5);
+                }
+                
+                await animateReel(reelStrips[i], i, res, isAnticipation);
+                document.getElementById('reel3').classList.remove('anticipation');
+                document.querySelector('.machine-core').classList.remove('machine-zoom');
+            }
+
+            calculatePayout(results, oldBalance - actualSpinCost);
+            state.isSpinning = false;
+            document.getElementById('spinBtn').disabled = false;
+
+            const checkRentInterval = setInterval(() => {
+                if (!state.isGambling) {
+                    clearInterval(checkRentInterval);
+                    if (state.spinsUntilRent <= 0) processRentDay();
+                    else updateUI();
+                }
+            }, 100);
+        }
+
+        function animateReel(strip, index, targetSymbol, anticipation = false) {
+            return new Promise(resolve => {
+                const count = anticipation ? 60 : 30 + (index * 10);
+                const duration = anticipation ? 3500 : 1500 + (index * 400);
+                
+                const tempSym = document.createElement('div');
+                tempSym.className = 'symbol';
+                tempSym.style.visibility = 'hidden';
+                strip.appendChild(tempSym);
+                const symbolHeight = tempSym.offsetHeight || 180;
+                strip.removeChild(tempSym);
+                
+                strip.innerHTML = '';
+                for (let i = 0; i < count; i++) {
+                    const div = document.createElement('div');
+                    div.className = 'symbol';
+                    div.textContent = (i === count - 2) ? targetSymbol : state.inventory[Math.floor(Math.random() * state.inventory.length)];
+                    strip.appendChild(div);
+                }
+
+                strip.style.transition = 'none';
+                strip.style.transform = 'translateY(0)';
+                strip.offsetHeight; 
+
+                const interval = setInterval(() => playSound('spin'), anticipation ? 50 : 100);
+                setTimeout(() => clearInterval(interval), duration);
+
+                strip.style.transition = `transform ${duration}ms cubic-bezier(${anticipation ? '0.2, 0, 0.2, 1' : '0.45, 0.05, 0.55, 0.95'})`;
+                strip.style.transform = `translateY(-${(count - 2.1) * symbolHeight}px)`;
+
+                setTimeout(() => {
+                    playSound('stop');
+                    triggerShake(anticipation);
+                    strip.children[count - 2].classList.add('win-animate');
+                    resolve(targetSymbol);
+                }, duration);
+            });
+        }
+
+        function checkNearMisses(results) {
+            const nearMisses = [];
+            const pairs = [
+                ['🍔', '🍟'], ['🗝️', '🔒'], ['🔥', '🍍'], ['🔥', '🍌'], 
+                ['👻', '💎'], ['⭐', '🪐'], ['⚒️', '🏔️']
+            ];
+
+            // Check for missing halves of synergies
+            pairs.forEach(p => {
+                if (results.includes(p[0]) && !results.includes(p[1])) nearMisses.push({ have: p[0], missing: p[1] });
+                else if (results.includes(p[1]) && !results.includes(p[0])) nearMisses.push({ have: p[1], missing: p[0] });
+            });
+
+            // Check for almost-jackpot (2 matching, 1 different)
+            if (results[0] === results[1] && results[1] !== results[2]) {
+                nearMisses.push({ have: results[0], missing: results[0], pos: 2 });
+            }
+
+            nearMisses.forEach((m, i) => {
+                setTimeout(() => {
+                    const reelIdx = m.pos !== undefined ? m.pos : (results.indexOf(m.have) + 1) % 3;
+                    const reelRect = document.getElementById(`reel${reelIdx + 1}`).getBoundingClientRect();
+                    showNearMissEffect(m.missing, reelRect.left + reelRect.width / 2, reelRect.top + reelRect.height / 2);
+                }, i * 300 + 500);
+            });
+        }
+
+        function showNearMissEffect(symbol, x, y) {
+            const ghost = document.createElement('div');
+            ghost.className = 'near-miss-ghost';
+            ghost.textContent = symbol;
+            ghost.style.left = `${x}px`;
+            ghost.style.top = `${y}px`;
+
+            const text = document.createElement('div');
+            text.className = 'so-close-text';
+            text.textContent = 'SO CLOSE!';
+            text.style.left = `${x}px`;
+            text.style.top = `${y + 40}px`;
+
+            document.body.appendChild(ghost);
+            document.body.appendChild(text);
+
+            setTimeout(() => {
+                ghost.remove();
+                text.remove();
+            }, 1500);
+        }
+
+        function calculatePayout(results, balanceBeforeWin) {
+            let win = 0;
+            let synergyBonus = 0;
+            const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+
+            checkNearMisses(results);
+
+            const isAdj = (idx, targetSym) => {
+                if (idx === 0) return results[1] === targetSym;
+                if (idx === 1) return results[0] === targetSym || results[2] === targetSym;
+                if (idx === 2) return results[1] === targetSym;
+                return false;
+            };
+
+            // Phase 1: Base Values & Synergies
+            results.forEach((s, i) => { 
+                let baseVal = ALL_SYMBOLS[s].value + (state.perks.VALUE * 2);
+                
+                // Event Modifiers for specific symbols
+                if (state.activeModifier === 'GOLD_RUSH' && ['💰', '💎', '7️⃣', '🐖', '🗝️', '🔒', '🎲', '👑'].includes(s)) {
+                    baseVal *= 2;
+                }
+
+                let triggerMsg = `+${baseVal}`;
+                let triggerType = 'flat';
+
+                if (s === '🌊') { baseVal += (state.day * 10); triggerMsg = `Day Wave +${baseVal}`; triggerType = 'flat'; }
+                if (s === '🐖') { const pVal = Math.floor(state.balance * 0.01); baseVal += pVal; triggerMsg = `Piggy +${pVal}`; }
+                if (s === '☀️' && state.day % 2 !== 0) { baseVal *= 2; triggerMsg = `Sun x2!`; triggerType = 'mult2'; }
+                if (s === '🌑' && state.day % 2 === 0) { baseVal *= 2; triggerMsg = `Moon x2!`; triggerType = 'mult2'; }
+                if (s === '🧸') { const tVal = (state.inventory.length * 2); baseVal += tVal; triggerMsg = `Teddy +${tVal}`; }
+
+                if (s === '💎' && isAdj(i, '👻')) { baseVal *= 2; triggerMsg = `Haunted 💎 x2!`; triggerType = 'mult2'; }
+                if ((s === '🍌' || s === '🍍') && isAdj(i, '🔥')) { baseVal *= 2; triggerMsg = `Grilled x2!`; triggerType = 'mult2'; }
+                if (s === '🪐' && isAdj(i, '⭐')) { baseVal *= 3; triggerMsg = `Cosmic x3!`; triggerType = 'mult3'; }
+                if (s === '⭐' && isAdj(i, '🪐')) { baseVal *= 3; triggerMsg = `Star Boost x3!`; triggerType = 'mult3'; }
+                if (s === '⚒️' && isAdj(i, '🏔️')) { baseVal += 100; triggerMsg = `Hammer +100!`; triggerType = 'gold'; }
+
+                if (s === '🍄') {
+                    const others = results.filter((sym, idx) => sym === '🍄' && idx !== i).length;
+                    if (others > 0) { baseVal += (others * 15); triggerMsg = `Colony +${others*15}`; }
+                }
+
+                const rect = reels[i].getBoundingClientRect();
+                setTimeout(() => showFloatingText(triggerMsg, rect.left + rect.width/2, rect.top + rect.height/2, triggerType), i * 200);
+                win += baseVal;
+            });
+
+            // Phase 2: Global Synergies
+            if (results.includes('🍔') && results.includes('🍟')) {
+                synergyBonus += 100;
+                setTimeout(() => showFloatingText("BURGER COMBO +100!", window.innerWidth/2, window.innerHeight/2, 'gold'), 600);
+            }
+            if (results.includes('🗝️') && results.includes('🔒')) {
+                synergyBonus += 500;
+                setTimeout(() => showFloatingText("UNLOCKED +500!", window.innerWidth/2, window.innerHeight/2, 'gold'), 700);
+            }
+            if (results.includes('🧙')) {
+                results.forEach((rs) => { if (ALL_SYMBOLS[rs].rarity === 'Rare') synergyBonus += ALL_SYMBOLS[rs].value; });
+                setTimeout(() => showFloatingText("WIZARD BUFF!", window.innerWidth/2, window.innerHeight/2 + 50, 'mult3'), 800);
+            }
+
+            // Phase 3: Total Multipliers
+            const unique = [...new Set(results)];
+            let finalMult = 1 + (state.perks.MULT * 0.2);
+
+            if (state.perks.BLOOD_PACT > 0) {
+                finalMult += 0.5;
+                setTimeout(() => showFloatingText("BLOOD PACT +50%", window.innerWidth/2, window.innerHeight/2 - 150, 'crit'), 1100);
+            }
+
+            if (state.activeModifier === 'FRIDAY_13') {
+                finalMult *= 0.77;
+                setTimeout(() => showFloatingText("FRIDAY 13th x0.77", window.innerWidth/2, 200, 'loss'), 1150);
+            }
+            
+            if ((results[0] === '🏔️' || results[2] === '🏔️') && results[0] === results[2]) {
+                finalMult *= 5;
+                setTimeout(() => showFloatingText("MOUNTAIN PEAK x5!", window.innerWidth/2, window.innerHeight/2 - 100, 'gold'), 1000);
+            }
+
+            let finalWin = Math.floor(win * finalMult) + synergyBonus;
+
+            if (unique.length === 1) {
+                finalWin *= (5 + state.perks.JACKPOT);
+                if (state.perks.CRIT > 0 && Math.random() < (state.perks.CRIT * 0.05)) {
+                    finalWin *= 5;
+                    setTimeout(() => showFloatingText("CRITICAL JACKPOT x5!", window.innerWidth/2, window.innerHeight/2, 'crit'), 1200);
+                }
+                triggerBigWinCelebration(finalWin);
+                setTimeout(() => startDoubleOrNothing(finalWin), 2500);
+                return; 
+            } else if (unique.length === 2) {
+                finalWin *= 2;
+                finalWin += (state.perks.SYNERGY * 50);
+                setTimeout(() => showFloatingText("PAIR x2!", window.innerWidth/2, window.innerHeight/2 + 100, 'mult2'), 400);
+                playSound('win');
+            } else if (finalWin > 0) {
+                playSound('win');
+            }
+
+            if (state.perks.CRIT > 0 && Math.random() < (state.perks.CRIT * 0.05)) {
+                finalWin *= 5;
+                setTimeout(() => showFloatingText("CRITICAL HIT x5!", window.innerWidth/2, window.innerHeight/2, 'crit'), 500);
+            }
+
+            state.balance += finalWin;
+            if (finalWin > 0) {
+                document.querySelector('.machine-core').classList.add('flash-win');
+                setTimeout(() => document.querySelector('.machine-core').classList.remove('flash-win'), 400);
+                animateBalance(balanceBeforeWin, state.balance);
+                triggerShake(true);
+                triggerCoins(Math.min(50, Math.floor(finalWin / 5) + 5), finalWin);
+            }
+        }
+
+        function triggerBigWinCelebration(amt) {
+            playSound('jackpot');
+            triggerCoins(100, 0, true);
+            const overlay = document.getElementById('bigWinOverlay');
+            document.getElementById('bigWinAmount').textContent = amt;
+            overlay.style.display = 'flex';
+            triggerShake(true);
+            document.querySelector('.machine-core').classList.add('flash-win');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                document.querySelector('.machine-core').classList.remove('flash-win');
+            }, 2500);
+        }
+
+        // --- Double or Nothing Logic ---
+
+        function startDoubleOrNothing(amount) {
+            state.gamblePot = amount;
+            state.isGambling = true;
+            document.getElementById('gamblePotDisplay').textContent = state.gamblePot;
+            document.getElementById('doubleOverlay').style.display = 'flex';
+            resetGambleUI();
+        }
+
+        function resetGambleUI() {
+            document.getElementById('gambleChoices').style.pointerEvents = 'auto';
+            document.getElementById('gambleResultControls').classList.add('hidden');
+            document.getElementById('gambleStatus').textContent = '';
+            document.getElementById('skipGambleBtn').classList.remove('hidden');
+            
+            const monA = document.getElementById('monitorA');
+            const monB = document.getElementById('monitorB');
+            monA.classList.remove('active-flicker', 'selected');
+            monB.classList.remove('active-flicker', 'selected');
+            document.getElementById('gambleAgainBtn').classList.remove('hidden');
+        }
+
+        function pickGamble(choice) {
+            document.getElementById('skipGambleBtn').classList.add('hidden');
+            const choices = document.getElementById('gambleChoices');
+            choices.style.pointerEvents = 'none';
+            
+            const monA = document.getElementById('monitorA');
+            const monB = document.getElementById('monitorB');
+            
+            if (choice === 'A') monA.classList.add('selected');
+            else monB.classList.add('selected');
+            
+            let flickerCount = 0;
+            const flickerInterval = setInterval(() => {
+                playSound('spin'); // Reuse spin tick for tension
+                if (flickerCount % 2 === 0) {
+                    monA.classList.add('active-flicker');
+                    monB.classList.remove('active-flicker');
+                } else {
+                    monA.classList.remove('active-flicker');
+                    monB.classList.add('active-flicker');
+                }
+                
+                flickerCount++;
+                
+                if (flickerCount > 40) {
+                    clearInterval(flickerInterval);
+                    finishGamble(choice);
+                }
+            }, 60);
+        }
+
+        function finishGamble(choice) {
+            const winRate = 0.5 + (state.perks.RISK * 0.1);
+            const isWin = Math.random() < winRate;
+            
+            // Visual result
+            const result = isWin ? choice : (choice === 'A' ? 'B' : 'A');
+            
+            const monA = document.getElementById('monitorA');
+            const monB = document.getElementById('monitorB');
+            monA.classList.remove('active-flicker');
+            monB.classList.remove('active-flicker');
+            
+            const winnerEl = result === 'A' ? monA : monB;
+            winnerEl.classList.add('active-flicker');
+
+            const status = document.getElementById('gambleStatus');
+            const controls = document.getElementById('gambleResultControls');
+            controls.classList.remove('hidden');
+
+            if (isWin) {
+                playSound('win');
+                state.gamblePot *= 2;
+                status.textContent = "JACKPOT DOUBLED!";
+                status.className = "text-2xl md:text-4xl mb-6 font-bold text-green-400";
+                document.getElementById('gamblePotDisplay').textContent = state.gamblePot;
+                triggerShake(true);
+                triggerCoins(30, 0);
+            } else {
+                playSound('stop');
+                state.gamblePot = 0;
+                status.textContent = "LOSE EVERYTHING!";
+                status.className = "text-2xl md:text-4xl mb-6 font-bold text-red-600";
+                document.getElementById('gamblePotDisplay').textContent = 0;
+                document.getElementById('gambleAgainBtn').classList.add('hidden');
+            }
+        }
+
+        function collectGamble() {
+            if (state.gamblePot > 0) {
+                const win = state.gamblePot;
+                state.balance += win;
+                addLog(`Collected ${win} from gamble!`, 'gain');
+                triggerCoins(Math.min(50, Math.floor(win / 10) + 10), win);
+                playSound('win');
+            }
+            state.gamblePot = 0;
+            state.isGambling = false;
+            document.getElementById('doubleOverlay').style.display = 'none';
+            document.getElementById('gambleAgainBtn').classList.remove('hidden');
+            updateUI();
+        }
+
+        function processRentDay() {
+            // Debt First
+            if (state.loanAmount > 0) {
+                if (state.balance >= state.loanTotalDue) {
+                    state.balance -= state.loanTotalDue;
+                    addLog(`LOAN REPAID: -${state.loanTotalDue}. Your soul is safe.`, 'loss');
+                    state.loanAmount = 0;
+                    state.loanTotalDue = 0;
+                } else {
+                    addLog(`DEFAULT! You couldn't pay the Shark.`, 'loss');
+                    triggerShake(true);
+                    // Penalty: Lose 3 random symbols
+                    for(let i=0; i<3; i++) {
+                        if (state.inventory.length > 3) {
+                            const idx = Math.floor(Math.random() * state.inventory.length);
+                            const removed = state.inventory.splice(idx, 1);
+                            addLog(`SHARK REPO: Removed ${removed[0]}!`, 'loss');
+                        }
+                    }
+                    state.loanAmount = 0;
+                    state.loanTotalDue = 0;
+                }
+            }
+
+            if (state.balance >= state.rentTarget) {
+                playSound('win'); // Ka-ching!
+                
+                // Dividend Perk
+                if (state.perks.DIVIDEND > 0 && state.balance > 500) {
+                    const div = Math.floor(state.rentTarget * 0.1 * state.perks.DIVIDEND);
+                    state.balance += div;
+                    addLog(`Dividends: Earned +${div} for wealth.`, "gain");
+                }
+
+                // Insurance Perk
+                if (state.perks.INSURANCE > 0 && Math.random() < (state.perks.INSURANCE * 0.1)) {
+                    addLog("Insurance: Landlord refunded your Rent!", "gain");
+                } else {
+                    const rebate = Math.floor(state.rentTarget * (state.perks.REBATE * 0.15));
+                    state.balance -= state.rentTarget;
+                    addLog(`Rent Paid: -${state.rentTarget}.`, 'loss');
+                    if (rebate > 0) {
+                        state.balance += rebate;
+                        addLog(`Rent Rebate: +${rebate} back!`, 'gain');
+                    }
+                }
+
+                // Cleanse Perk
+                if (state.perks.CLEANSE > 0) {
+                    for(let i=0; i<state.perks.CLEANSE; i++) {
+                        const cIdx = state.inventory.findIndex(item => ALL_SYMBOLS[item].rarity === 'Common');
+                        if (cIdx > -1) {
+                            const rem = state.inventory.splice(cIdx, 1);
+                            addLog(`Cleanse: Removed ${rem[0]}.`, "loss");
+                        }
+                    }
+                }
+
+                advanceDay();
+            } else if (state.perks.LIFE > 0) {
+                playSound('jackpot'); // Warning sound
+                state.perks.LIFE--;
+                addLog(`RENT SHIELD ACTIVATED! Eviction avoided.`, 'gain');
+                advanceDay();
+            } else {
+                checkGameOver();
+            }
+            updateUI();
+        }
+
+        function takeLoan(amt) {
+            if (state.loanAmount > 0) return;
+            state.loanAmount = amt;
+            state.loanTotalDue = Math.floor(amt * 1.5);
+            state.balance += amt;
+            addLog(`LOAN TAKEN: +${amt} credits. Payback ${state.loanTotalDue} next Rent Day!`, 'gain');
+            playSound('jackpot');
+            triggerShake(false);
+            updateUI();
+        }
+
+        function advanceDay() {
+            if (state.perks.INTEREST > 0) {
+                const interest = Math.floor(state.balance * (state.perks.INTEREST * 0.05));
+                if (interest > 0) {
+                    state.balance += interest;
+                    addLog(`Earned ${interest} interest.`, 'gain');
+                }
+            }
+
+            state.day++;
+            
+            // Modifier logic
+            let dayMod = 'CLEAR_SKIES';
+            if (state.day === 7 || state.day === 13) dayMod = 'FRIDAY_13';
+            else if (state.day > 10 && Math.random() < 0.3) dayMod = 'HEAT_WAVE';
+            else if (state.day % 5 === 0) dayMod = 'GOLD_RUSH';
+            
+            state.activeModifier = dayMod;
+            if (dayMod !== 'CLEAR_SKIES') addLog(`Daily Event: ${MODIFIERS[dayMod].name}!`, 'gain');
+            showFloatingText(MODIFIERS[dayMod].name.toUpperCase(), window.innerWidth/2, 100, 'crit');
+
+            // Steeper rent multiplier for late game difficulty
+            const rentMultiplier = 1.9 - (state.perks.TAX_BREAK * 0.15);
+            state.rentTarget = Math.floor(state.rentTarget * Math.max(1.1, rentMultiplier)) + (state.day * 30);
+            state.spinsUntilRent = 5 + state.perks.EXTRA;
+            // Spin cost rises more progressively
+            state.spinCost += (state.day < 5) ? 2 : 3;
+            state.draftPicksRemaining = 1 + state.perks.MASTER;
+            showDraftOverlay();
+        }
+
+        function showDraftOverlay() {
+            if (state.draftPicksRemaining <= 0) {
+                document.getElementById('draftOverlay').style.display = 'none';
+                updateUI();
+                return;
+            }
+
+            const overlay = document.getElementById('draftOverlay');
+            const optionsContainer = document.getElementById('draftOptions');
+            optionsContainer.innerHTML = '';
+            overlay.scrollTop = 0;
+            overlay.style.display = 'flex';
+
+            const header = overlay.querySelector('p');
+            header.textContent = `Draft Picks Remaining: ${state.draftPicksRemaining}`;
+
+            const keys = Object.keys(ALL_SYMBOLS);
+            const luckBonus = state.perks.LUCK;
+            
+            // Pity System
+            const isPityTriggered = state.pityCounter >= 3;
+            if (isPityTriggered) addLog("Pity System: Rare+ choice guaranteed!", "gain");
+
+            // Calculate options count
+            const numOptions = 3 + (state.perks.MASTER >= 1 ? 1 : 0) + (state.perks.MASTER >= 2 ? 1 : 0);
+
+            const getWeightedSymbol = (pity = false) => {
+                let pool = ['Common', 'Uncommon'];
+                if (pity || Math.random() < (0.1 + luckBonus * 0.05)) pool = ['Rare', 'Epic', 'Legendary'];
+                else if (Math.random() < (0.3 + luckBonus * 0.1)) pool = ['Uncommon', 'Rare'];
+                
+                const filtered = keys.filter(k => pool.includes(ALL_SYMBOLS[k].rarity));
+                return filtered[Math.floor(Math.random() * filtered.length)];
+            };
+
+            const options = [];
+            let hasRarePlus = false;
+
+            for (let i = 0; i < numOptions; i++) {
+                // Last option is usually a perk, but we can randomize types
+                const type = (i === numOptions - 1) ? 'perk' : 'symbol';
+                
+                if (type === 'symbol') {
+                    const key = getWeightedSymbol(isPityTriggered && !hasRarePlus && i === numOptions - 2);
+                    const sym = ALL_SYMBOLS[key];
+                    if (['Rare', 'Epic', 'Legendary'].includes(sym.rarity)) hasRarePlus = true;
+                    options.push({ type: 'symbol', key, data: sym });
+                } else {
+                    const perkKeys = Object.keys(PERKS);
+                    const perkKey = perkKeys[Math.floor(Math.random() * perkKeys.length)];
+                    options.push({ type: 'perk', key: perkKey, data: PERKS[perkKey] });
+                }
+            }
+
+            // Update Pity Counter
+            if (hasRarePlus) state.pityCounter = 0;
+            else state.pityCounter++;
+
+            options.forEach(opt => {
+                const card = document.createElement('div');
+                const rarityColors = { 'Common': 'text-gray-400', 'Uncommon': 'text-green-400', 'Rare': 'text-blue-400', 'Epic': 'text-purple-400', 'Legendary': 'text-yellow-400' };
+                
+                if (opt.type === 'symbol') {
+                    card.className = 'draft-card border-2 border-gray-700 hover:border-blue-500';
+                    card.innerHTML = `
+                        <div class="text-[10px] font-bold uppercase tracking-widest mb-2 ${rarityColors[opt.data.rarity]}">${opt.data.rarity}</div>
+                        <div class="icon text-5xl md:text-6xl mb-4">${opt.key}</div>
+                        <h3 class="text-white text-sm md:text-base mb-2">${opt.data.name}</h3>
+                        <p class="desc text-xs text-gray-400 px-2 h-10 overflow-hidden mb-4">${opt.data.desc}</p>
+                        <div class="pt-4 border-t border-gray-800 text-green-400 font-bold">Value: ${opt.data.value}</div>
+                    `;
+                    card.onclick = () => {
+                        state.inventory.push(opt.key);
+                        addLog(`Drafted: ${opt.data.name}`, 'gain');
+                        state.draftPicksRemaining--;
+                        showDraftOverlay();
+                    };
+                } else {
+                    const isCursed = opt.data.cursed;
+                    card.className = `draft-card border-2 ${isCursed ? 'cursed-card' : 'border-yellow-600 hover:border-yellow-400 bg-yellow-900/10'}`;
+                    card.innerHTML = `
+                        <div class="text-[10px] font-bold uppercase tracking-widest mb-2 ${isCursed ? 'text-red-500' : 'text-yellow-500'}">${isCursed ? 'CURSED CONTRACT' : 'UPGRADE / PERK'}</div>
+                        <div class="icon text-5xl md:text-6xl mb-4">${opt.data.icon}</div>
+                        <h3 class="text-white text-sm md:text-base mb-2">${opt.data.name}</h3>
+                        <p class="desc text-xs text-gray-400 px-2 h-10 overflow-hidden mb-4">${opt.data.desc}</p>
+                        <div class="pt-4 border-t border-gray-800 ${isCursed ? 'text-red-400' : 'text-yellow-400'} font-bold italic">Stackable Level +1</div>
+                    `;
+                    card.onclick = () => {
+                        state.perks[opt.key]++;
+                        addLog(`Contracted: ${opt.data.name}`, isCursed ? 'loss' : 'gain');
+                        
+                        if (!isCursed && state.perks.SALVAGE > 0 && Math.random() < (state.perks.SALVAGE * 0.25)) {
+                            const rares = Object.keys(ALL_SYMBOLS).filter(k => ALL_SYMBOLS[k].rarity === 'Rare');
+                            const reward = rares[Math.floor(Math.random() * rares.length)];
+                            state.inventory.push(reward);
+                            addLog(`Salvage: Found bonus ${reward}!`, "gain");
+                        }
+
+                        state.draftPicksRemaining--;
+                        showDraftOverlay();
+                    };
+                }
+                optionsContainer.appendChild(card);
+            });
+        }
+
+        function checkGameOver() {
+            if (state.balance < state.rentTarget || state.balance < state.spinCost) {
+                const over = document.getElementById('gameOverOverlay');
+                document.getElementById('finalStats').textContent = `You survived ${state.day} days and reached Rent #${state.day}.`;
+                over.style.display = 'flex';
+            }
+        }
+
+        // --- Coin Particles ---
+        const canvas = document.getElementById('coin-canvas');
+        const ctx = canvas.getContext('2d');
+        let coins = [];
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor(type, onReach) {
+                this.type = type; // 'coin' or 'confetti'
+                this.x = window.innerWidth / 2;
+                this.y = window.innerHeight / 2;
+                this.vx = (Math.random() - 0.5) * 50;
+                this.vy = -Math.random() * 40 - 20;
+                this.life = type === 'coin' ? 180 : 200; // Increased life to ensure they reach target
+                this.maxLife = this.life;
+                this.color = type === 'coin' ? '#fbbf24' : `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.target = document.getElementById('balanceDisplay').getBoundingClientRect();
+                this.magnetStrength = 0;
+                this.onReach = onReach;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rv = (Math.random() - 0.5) * 0.3;
+            }
+            update() {
+                this.life--;
+                
+                if (this.type === 'coin' && this.life < 130) {
+                    this.magnetStrength += 0.8;
+                    // Recalculate target position in case of window shifts
+                    const rect = document.getElementById('balanceDisplay').getBoundingClientRect();
+                    const targetX = rect.left + rect.width/2;
+                    const targetY = rect.top + rect.height/2;
+                    const dx = targetX - this.x;
+                    const dy = targetY - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist > 25 && this.life > 5) {
+                        this.vx += (dx / dist) * this.magnetStrength;
+                        this.vy += (dy / dist) * this.magnetStrength;
+                        this.vx *= 0.82; 
+                        this.vy *= 0.82;
+                    } else {
+                        // Snap to target and expire
+                        if (this.onReach) this.onReach();
+                        playSound('collect');
+                        this.life = 0;
+                    }
+                } else {
+                    this.vy += 1.2;
+                    this.vx *= 0.98;
+                    this.rotation += this.rv;
+                }
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+            draw() {
+                if (this.life <= 0) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                if (this.type === 'coin') {
+                    const radius = Math.min(12, this.life);
+                    
+                    // Black Outline (Cartoony)
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius + 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#000';
+                    ctx.fill();
+                    
+                    // Main Coin Body
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    
+                    // Inner Detail (Cartoony $)
+                    ctx.fillStyle = '#92400e'; // Darker gold/brown for contrast
+                    ctx.font = `bold ${radius * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('$', 0, 1);
+                } else {
+                    const s = Math.min(10, this.life/10);
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(-s/2, -s/2, s, s);
+                }
+                ctx.restore();
+            }
+        }
+
+        function triggerCoins(amt, winAmount = 0, isJackpot = false) {
+            if (!settings.particles) {
+                if (winAmount > 0) showFloatingText(winAmount);
+                return;
+            }
+            const balanceRect = document.getElementById('balanceDisplay').getBoundingClientRect();
+            const totalParticles = isJackpot ? amt + 50 : amt;
+            
+            for(let i=0; i < totalParticles; i++) {
+                setTimeout(() => {
+                    const type = (isJackpot && i > amt) ? 'confetti' : 'coin';
+                    const isLast = (i === totalParticles - 1);
+                    const p = new Particle(type, isLast && winAmount > 0 ? () => showFloatingText(winAmount) : null);
+                    p.target = balanceRect;
+                    coins.push(p);
+                }, i * 10);
+            }
+        }
+
+        function showFloatingText(content, x, y, type = 'flat') {
+            const el = document.createElement('div');
+            el.className = `floating-win-text ${type}`;
+            el.textContent = typeof content === 'number' ? `+${content}` : content;
+            
+            if (x === undefined || y === undefined) {
+                const rect = document.getElementById('balanceDisplay').getBoundingClientRect();
+                x = rect.left + rect.width / 2;
+                y = rect.top;
+            }
+            
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            document.body.appendChild(el);
+            
+            setTimeout(() => el.remove(), 1200);
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            coins = coins.filter(c => c.life > 0);
+            coins.forEach(c => { c.update(); c.draw(); });
+            requestAnimationFrame(animateParticles);
+        }
+
+        // Init
+        initSettings();
+        updateUI();
+        animateParticles();
+
+    </script>
+</body>
+</html>
